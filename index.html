@@ -136,12 +136,17 @@
             margin-right: 10px;
         }
         
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
         .btn-borrow {
             background-color: #28a745;
             color: white;
         }
         
-        .btn-borrow:hover {
+        .btn-borrow:hover:not(:disabled) {
             background-color: #218838;
             transform: translateY(-2px);
         }
@@ -151,7 +156,7 @@
             color: white;
         }
         
-        .btn-return:hover {
+        .btn-return:hover:not(:disabled) {
             background-color: #c82333;
             transform: translateY(-2px);
         }
@@ -212,6 +217,21 @@
             color: #6c757d;
         }
         
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            border: 1px solid #f5c6cb;
+        }
+        
         @media (max-width: 768px) {
             .form-row {
                 flex-direction: column;
@@ -227,6 +247,7 @@
     <div class="header">
         <h1>📊 CHECKSHEET QUẢN LÝ MÁY TÍNH PHÒNG HỌP</h1>
         <p>Vui lòng ghi đầy đủ thông tin khi mượn và trả máy tính</p>
+        <p><small>🔄 Dữ liệu được đồng bộ với Google Sheets</small></p>
     </div>
 
     <!-- Máy tính 1 -->
@@ -240,7 +261,7 @@
                 ✅ ĐANG RẢNH
             </div>
             <div style="flex: 1; text-align: right;">
-                <button class="btn btn-borrow" onclick="toggleBorrowForm(1)">Mượn máy</button>
+                <button class="btn btn-borrow" onclick="toggleBorrowForm(1)" id="borrowBtn1">Mượn máy</button>
                 <button class="btn btn-return" onclick="returnComputer(1)" style="display: none;" id="returnBtn1">Trả máy</button>
             </div>
         </div>
@@ -275,7 +296,7 @@
                     <input type="datetime-local" id="returnTime1">
                 </div>
             </div>
-            <button class="btn btn-borrow" onclick="borrowComputer(1)">Xác nhận mượn</button>
+            <button class="btn btn-borrow" onclick="borrowComputer(1)" id="confirmBorrow1">Xác nhận mượn</button>
         </div>
 
         <div class="current-user" id="currentUser1" style="display: none;">
@@ -290,7 +311,7 @@
         <div class="history-section">
             <div class="history-title">📋 Lịch sử sử dụng hôm nay</div>
             <div class="history-list" id="history1">
-                <div class="history-item">Chưa có ai sử dụng hôm nay</div>
+                <div class="loading">Đang tải lịch sử...</div>
             </div>
         </div>
     </div>
@@ -306,7 +327,7 @@
                 ✅ ĐANG RẢNH
             </div>
             <div style="flex: 1; text-align: right;">
-                <button class="btn btn-borrow" onclick="toggleBorrowForm(2)">Mượn máy</button>
+                <button class="btn btn-borrow" onclick="toggleBorrowForm(2)" id="borrowBtn2">Mượn máy</button>
                 <button class="btn btn-return" onclick="returnComputer(2)" style="display: none;" id="returnBtn2">Trả máy</button>
             </div>
         </div>
@@ -341,7 +362,7 @@
                     <input type="datetime-local" id="returnTime2">
                 </div>
             </div>
-            <button class="btn btn-borrow" onclick="borrowComputer(2)">Xác nhận mượn</button>
+            <button class="btn btn-borrow" onclick="borrowComputer(2)" id="confirmBorrow2">Xác nhận mượn</button>
         </div>
 
         <div class="current-user" id="currentUser2" style="display: none;">
@@ -356,7 +377,7 @@
         <div class="history-section">
             <div class="history-title">📋 Lịch sử sử dụng hôm nay</div>
             <div class="history-list" id="history2">
-                <div class="history-item">Chưa có ai sử dụng hôm nay</div>
+                <div class="loading">Đang tải lịch sử...</div>
             </div>
         </div>
     </div>
@@ -367,21 +388,102 @@
     </div>
 
     <script>
+        // Thay YOUR_APPS_SCRIPT_URL bằng URL thực tế của Google Apps Script
+        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxGvxDmDDydnS1wLrOVnWK7fgCvYZq7wbmw3Td-luSXUrPzAz0d75rxjfzBQSHskBEiwQ/exec';
+        
         // Dữ liệu lưu trữ tạm thời
         let computerData = {
             1: { isInUse: false, currentUser: null, history: [] },
             2: { isInUse: false, currentUser: null, history: [] }
         };
 
+        // Load dữ liệu khi trang khởi động
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeDefaultTimes();
+            loadCurrentStatus();
+            loadHistory(1);
+            loadHistory(2);
+            
+            // Auto refresh mỗi 30 giây
+            setInterval(() => {
+                loadCurrentStatus();
+                loadHistory(1);
+                loadHistory(2);
+            }, 30000);
+        });
+
+        function initializeDefaultTimes() {
+            const now = new Date();
+            now.setHours(now.getHours() + 2);
+            const defaultTime = now.toISOString().slice(0, 16);
+            
+            document.getElementById('returnTime1').value = defaultTime;
+            document.getElementById('returnTime2').value = defaultTime;
+        }
+
+        async function loadCurrentStatus() {
+            try {
+                const response = await fetch(`${APPS_SCRIPT_URL}?action=getCurrentStatus`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    showError('Lỗi tải trạng thái: ' + data.error);
+                    return;
+                }
+                
+                computerData = data;
+                updateComputerStatus(1);
+                updateComputerStatus(2);
+            } catch (error) {
+                console.error('Lỗi tải trạng thái:', error);
+                showError('Không thể kết nối đến server. Sử dụng dữ liệu offline.');
+            }
+        }
+
+        async function loadHistory(computerId) {
+            try {
+                const response = await fetch(`${APPS_SCRIPT_URL}?action=getHistory&computerId=${computerId}`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    showHistoryError(computerId, 'Lỗi tải lịch sử: ' + data.error);
+                    return;
+                }
+                
+                computerData[computerId].history = data;
+                updateHistory(computerId);
+            } catch (error) {
+                console.error('Lỗi tải lịch sử:', error);
+                showHistoryError(computerId, 'Không thể tải lịch sử');
+            }
+        }
+
+        function showError(message) {
+            // Tạo thông báo lỗi tạm thời
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error';
+            errorDiv.textContent = message;
+            document.body.insertBefore(errorDiv, document.querySelector('.computer-section'));
+            
+            setTimeout(() => {
+                errorDiv.remove();
+            }, 5000);
+        }
+
+        function showHistoryError(computerId, message) {
+            const historyContainer = document.getElementById(`history${computerId}`);
+            historyContainer.innerHTML = `<div class="error">${message}</div>`;
+        }
+
         function toggleBorrowForm(computerId) {
             const form = document.getElementById(`borrowForm${computerId}`);
             form.style.display = form.style.display === 'none' ? 'block' : 'none';
         }
 
-        function borrowComputer(computerId) {
-            const name = document.getElementById(`name${computerId}`).value;
+        async function borrowComputer(computerId) {
+            const name = document.getElementById(`name${computerId}`).value.trim();
             const department = document.getElementById(`department${computerId}`).value;
-            const purpose = document.getElementById(`purpose${computerId}`).value;
+            const purpose = document.getElementById(`purpose${computerId}`).value.trim();
             const returnTime = document.getElementById(`returnTime${computerId}`).value;
 
             if (!name || !department || !purpose || !returnTime) {
@@ -389,109 +491,74 @@
                 return;
             }
 
-            const now = new Date();
-            const borrowTime = now.toLocaleString('vi-VN');
+            const borrowBtn = document.getElementById(`confirmBorrow${computerId}`);
+            borrowBtn.disabled = true;
+            borrowBtn.textContent = 'Đang xử lý...';
 
-            // Cập nhật trạng thái
-            computerData[computerId].isInUse = true;
-            computerData[computerId].currentUser = {
-                name: name,
-                department: department,
-                purpose: purpose,
-                borrowTime: borrowTime,
-                returnTime: new Date(returnTime).toLocaleString('vi-VN')
-            };
+            try {
+                const borrowTime = new Date().toLocaleString('vi-VN');
+                const userData = {
+                    name: name,
+                    department: department,
+                    purpose: purpose,
+                    borrowTime: borrowTime,
+                    returnTime: new Date(returnTime).toLocaleString('vi-VN')
+                };
 
-            // Cập nhật giao diện
-            updateComputerStatus(computerId);
-            
-            // Thêm vào lịch sử
-            addToHistory(computerId, name, department, purpose, borrowTime, 'Mượn máy');
+                const response = await fetch(APPS_SCRIPT_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        action: 'borrowComputer',
+                        computerId: computerId.toString(),
+                        userData: userData
+                    })
+                });
 
-            // Reset form
-            document.getElementById(`name${computerId}`).value = '';
-            document.getElementById(`department${computerId}`).value = '';
-            document.getElementById(`purpose${computerId}`).value = '';
-            document.getElementById(`returnTime${computerId}`).value = '';
-            document.getElementById(`borrowForm${computerId}`).style.display = 'none';
+                const result = await response.json();
+                
+                if (result.error) {
+                    alert('Lỗi: ' + result.error);
+                    return;
+                }
 
-            alert('Đã ghi nhận thông tin mượn máy thành công!');
+                // Cập nhật dữ liệu local
+                computerData[computerId].isInUse = true;
+                computerData[computerId].currentUser = userData;
+
+                // Cập nhật giao diện
+                updateComputerStatus(computerId);
+                
+                // Reset form
+                resetForm(computerId);
+                document.getElementById(`borrowForm${computerId}`).style.display = 'none';
+
+                alert(result.message || 'Đã ghi nhận thông tin mượn máy thành công!');
+                
+                // Reload lịch sử
+                loadHistory(computerId);
+                
+            } catch (error) {
+                console.error('Lỗi mượn máy:', error);
+                alert('Không thể kết nối đến server. Vui lòng thử lại.');
+            } finally {
+                borrowBtn.disabled = false;
+                borrowBtn.textContent = 'Xác nhận mượn';
+            }
         }
 
-        function returnComputer(computerId) {
-            if (!computerData[computerId].isInUse) return;
+        async function returnComputer(computerId) {
+            if (!computerData[computerId] || !computerData[computerId].isInUse) {
+                alert('Máy này không được sử dụng!');
+                return;
+            }
 
-            const userData = computerData[computerId].currentUser;
-            const returnTime = new Date().toLocaleString('vi-VN');
-
-            // Thêm vào lịch sử
-            addToHistory(computerId, userData.name, userData.department, userData.purpose, returnTime, 'Trả máy');
-
-            // Reset trạng thái
-            computerData[computerId].isInUse = false;
-            computerData[computerId].currentUser = null;
-
-            // Cập nhật giao diện
-            updateComputerStatus(computerId);
-
-            alert('Đã ghi nhận trả máy thành công!');
-        }
-
-        function updateComputerStatus(computerId) {
-            const status = document.getElementById(`status${computerId}`);
-            const currentUser = document.getElementById(`currentUser${computerId}`);
             const returnBtn = document.getElementById(`returnBtn${computerId}`);
+            returnBtn.disabled = true;
+            returnBtn.textContent = 'Đang xử lý...';
 
-            if (computerData[computerId].isInUse) {
-                status.className = 'status-box status-in-use';
-                status.innerHTML = '🔴 ĐANG SỬ DỤNG';
-                
-                const user = computerData[computerId].currentUser;
-                document.getElementById(`currentName${computerId}`).textContent = user.name;
-                document.getElementById(`currentDept${computerId}`).textContent = user.department;
-                document.getElementById(`currentPurpose${computerId}`).textContent = user.purpose;
-                document.getElementById(`borrowTime${computerId}`).textContent = user.borrowTime;
-                document.getElementById(`expectedReturn${computerId}`).textContent = user.returnTime;
-                
-                currentUser.style.display = 'block';
-                returnBtn.style.display = 'inline-block';
-            } else {
-                status.className = 'status-box status-available';
-                status.innerHTML = '✅ ĐANG RẢNH';
-                currentUser.style.display = 'none';
-                returnBtn.style.display = 'none';
-            }
-        }
-
-        function addToHistory(computerId, name, department, purpose, time, action) {
-            const historyContainer = document.getElementById(`history${computerId}`);
-            
-            if (computerData[computerId].history.length === 0) {
-                historyContainer.innerHTML = '';
-            }
-
-            const historyItem = document.createElement('div');
-            historyItem.className = 'history-item';
-            historyItem.innerHTML = `
-                <strong>${time}</strong> - ${name} (${department}) - ${action}<br>
-                <small>Mục đích: ${purpose}</small>
-            `;
-            
-            historyContainer.insertBefore(historyItem, historyContainer.firstChild);
-            computerData[computerId].history.push({
-                name, department, purpose, time, action
-            });
-        }
-
-        // Khởi tạo thời gian mặc định
-        document.addEventListener('DOMContentLoaded', function() {
-            const now = new Date();
-            now.setHours(now.getHours() + 2); // Mặc định 2 tiếng sau
-            const defaultTime = now.toISOString().slice(0, 16);
-            
-            document.getElementById('returnTime1').value = defaultTime;
-            document.getElementById('returnTime2').value = defaultTime;
-        });
-    </script>
-</body>
-</html>
+            try {
+                const response = await fetch(APPS_SCRIPT_URL, {
+                    method:
