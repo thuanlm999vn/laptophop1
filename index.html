@@ -2,131 +2,21 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <title>Checksheet Quản Lý Máy Tính Phòng Họp</title>
+  <title>Checksheet Quản Lý Máy Tính</title>
   <style>
-    body { font-family: Arial; max-width: 1000px; margin: auto; background: #f4f4f4; padding: 20px; }
-    .section { background: white; padding: 20px; margin-bottom: 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-    .title { font-size: 20px; font-weight: bold; margin-bottom: 10px; }
-    .status { margin: 10px 0; font-weight: bold; }
-    .form-group { margin-bottom: 10px; }
-    .form-group label { display: block; font-weight: bold; }
-    .form-group input, select { width: 100%; padding: 8px; }
-    .btn { padding: 10px 15px; margin-top: 10px; cursor: pointer; }
-    .btn-borrow { background: #28a745; color: white; border: none; }
-    .btn-return { background: #dc3545; color: white; border: none; }
-    .history { background: #f9f9f9; padding: 10px; margin-top: 20px; max-height: 200px; overflow-y: auto; }
-    .history-item { border-bottom: 1px solid #ccc; padding: 5px 0; }
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: #f0f0f0;
+    }
+    iframe {
+      border: none;
+      width: 100%;
+      height: 100vh;
+    }
   </style>
 </head>
 <body>
-  <h2>📊 CHECKSHEET QUẢN LÝ MÁY TÍNH PHÒNG HỌP</h2>
-
-  <div id="app"></div>
-
-  <script>
-    const computers = [1, 2];
-    const currentStatus = { 1: 'available', 2: 'available' };
-
-    function render() {
-      const container = document.getElementById('app');
-      container.innerHTML = '';
-      computers.forEach(id => {
-        const section = document.createElement('div');
-        section.className = 'section';
-        section.innerHTML = `
-          <div class="title">💻 MÁY TÍNH ${id}</div>
-          <div class="status" id="status${id}">✅ ĐANG RẢNH</div>
-          <button class="btn btn-borrow" onclick="toggleForm(${id})">Mượn máy</button>
-          <button class="btn btn-return" onclick="returnComputer(${id})">Trả máy</button>
-          <div class="form" id="form${id}" style="display: none;">
-            <div class="form-group"><label>Họ tên:</label><input type="text" id="name${id}"></div>
-            <div class="form-group"><label>Phòng ban:</label>
-              <select id="dept${id}">
-                <option value="">--Chọn--</option>
-                <option>HR</option>
-                <option>Kế toán</option>
-                <option>PD</option>
-                <option>PE</option>
-                <option>QC</option>
-                <option>PC</option>
-                <option>Khác</option>
-              </select>
-            </div>
-            <div class="form-group"><label>Mục đích:</label><input type="text" id="purpose${id}"></div>
-            <button class="btn btn-borrow" onclick="borrowComputer(${id})">Xác nhận mượn</button>
-          </div>
-          <div class="history" id="history${id}">⌛ Đang tải lịch sử...</div>
-        `;
-        container.appendChild(section);
-        updateStatus(id);
-        loadHistory(id);
-      });
-    }
-
-    function toggleForm(id) {
-      const form = document.getElementById(`form${id}`);
-      form.style.display = (form.style.display === 'none' || form.style.display === '') ? 'block' : 'none';
-    }
-
-    function updateStatus(id) {
-      const statusDiv = document.getElementById(`status${id}`);
-      if (currentStatus[id] === 'available') {
-        statusDiv.textContent = '✅ ĐANG RẢNH';
-        statusDiv.style.color = 'green';
-      } else {
-        statusDiv.textContent = '🔴 ĐANG Sử DỤNG';
-        statusDiv.style.color = 'red';
-      }
-    }
-
-    function borrowComputer(id) {
-      const name = document.getElementById(`name${id}`).value;
-      const dept = document.getElementById(`dept${id}`).value;
-      const purpose = document.getElementById(`purpose${id}`).value;
-      if (!name || !dept || !purpose) {
-        alert("Vui lòng nhập đủ thông tin!");
-        return;
-      }
-
-      const time = new Date().toLocaleString('vi-VN');
-      const data = { name, department: dept, purpose, time, action: 'Mượn máy' };
-
-      google.script.run.ghiLichSu(`LichSu${id}`, data);
-      alert("✅ Đã ghi nhận mượn máy!");
-      document.getElementById(`form${id}`).style.display = 'none';
-      currentStatus[id] = 'busy';
-      updateStatus(id);
-      loadHistory(id);
-    }
-
-    function returnComputer(id) {
-      const time = new Date().toLocaleString('vi-VN');
-      const data = { name: 'Không rõ', department: '', purpose: '', time, action: 'Trả máy' };
-      google.script.run.ghiLichSu(`LichSu${id}`, data);
-      alert("✅ Đã ghi nhận trả máy!");
-      currentStatus[id] = 'available';
-      updateStatus(id);
-      loadHistory(id);
-    }
-
-    function loadHistory(id) {
-      google.script.run.withSuccessHandler(data => {
-        const container = document.getElementById(`history${id}`);
-        if (!data || data.length === 0) {
-          container.innerHTML = 'Chưa có lịch sử sử dụng.';
-          return;
-        }
-        container.innerHTML = '';
-        data.forEach(row => {
-          const div = document.createElement('div');
-          div.className = 'history-item';
-          div.innerHTML = `<strong>${row[0]}</strong> - ${row[1]} (${row[2]}) - ${row[4]}<br><small>${row[3]}</small>`;
-          container.appendChild(div);
-        });
-      }).layLichSu(`LichSu${id}`);
-    }
-
-    document.addEventListener('DOMContentLoaded', render);
-  </script>
+  <iframe src="https://script.google.com/macros/s/AKfycbx97eI-Q8QAFDuKIoAv8ZHz9nZ6DkitG-ZgzLZXbRn1leUtG-Ip8d3YTggn8CRZpPBj/exec" allow="fullscreen"></iframe>
 </body>
 </html>
