@@ -811,6 +811,8 @@
                         <strong id="user-name-display">Admin</strong>
                         <div style="font-size: 12px; color: #999; margin-top: 3px;" id="user-role-display">Quản trị viên</div>
                     </a>
+                    <a href="#" id="order-management-link" style="display:none;" onclick="showOrderManagement(); return false;">📦 Quản lý đơn hàng</a>
+                    <a href="#" onclick="showHome(); return false;">🏠 Trang chủ</a>
                     <a href="#" onclick="logout(); return false;">Đăng xuất</a>
                 </div>
             </div>
@@ -824,7 +826,10 @@
 <div class="admin-controls" id="admin-controls">
     <div class="admin-header">
         <h3>🛠️ Quản lý sản phẩm (Firebase Mode)</h3>
-        <button class="btn-add-product" onclick="showAddProductModal()">➕ Thêm sản phẩm</button>
+        <div style="display: flex; gap: 10px;">
+            <button class="btn-add-product" onclick="showOrderManagement()">📦 Quản lý đơn hàng</button>
+            <button class="btn-add-product" onclick="showAddProductModal()">➕ Thêm sản phẩm</button>
+        </div>
     </div>
 </div>
 
@@ -847,6 +852,28 @@
             <p style="text-align: center; grid-column: 1/-1;">Đang tải dữ liệu...</p>
         </div>
     </section>
+</div>
+
+<div id="order-management" class="order-management">
+    <div class="order-header">
+        <h2>📦 Quản lý đơn hàng</h2>
+        <button class="back-btn" onclick="showHome()">← Quay lại</button>
+    </div>
+    
+    <div class="order-filters">
+        <select id="status-filter" onchange="filterOrders()">
+            <option value="all">Tất cả đơn hàng</option>
+            <option value="Đang xử lý">Đang xử lý</option>
+            <option value="Đang giao">Đang giao</option>
+            <option value="Hoàn thành">Hoàn thành</option>
+            <option value="Đã hủy">Đã hủy</option>
+        </select>
+        <button class="btn-add-product" onclick="loadOrders()">🔄 Làm mới</button>
+    </div>
+    
+    <div class="order-table" id="order-table">
+        <p style="text-align: center; padding: 40px;">Đang tải đơn hàng...</p>
+    </div>
 </div>
 
 <div id="detail-page" class="product-detail">
@@ -991,6 +1018,48 @@
     </div>
 </div>
 
+<div class="modal" id="order-detail-modal" onclick="closeModalOnOutside(event, 'order-detail-modal')">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <h3>📋 Chi tiết đơn hàng</h3>
+        <div id="order-detail-content"></div>
+        <div class="form-actions">
+            <button class="btn-secondary" onclick="closeModal('order-detail-modal')">Đóng</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="edit-order-modal" onclick="closeModalOnOutside(event, 'edit-order-modal')">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <h3>✏️ Sửa đơn hàng</h3>
+        <input type="hidden" id="edit-order-id">
+        <div class="form-group">
+            <label>Tên khách hàng</label>
+            <input type="text" id="edit-order-name">
+        </div>
+        <div class="form-group">
+            <label>Số điện thoại</label>
+            <input type="tel" id="edit-order-phone">
+        </div>
+        <div class="form-group">
+            <label>Địa chỉ giao hàng</label>
+            <textarea id="edit-order-address" rows="2"></textarea>
+        </div>
+        <div class="form-group">
+            <label>Trạng thái đơn hàng</label>
+            <select id="edit-order-status">
+                <option value="Đang xử lý">Đang xử lý</option>
+                <option value="Đang giao">Đang giao</option>
+                <option value="Hoàn thành">Hoàn thành</option>
+                <option value="Đã hủy">Đã hủy</option>
+            </select>
+        </div>
+        <div class="form-actions">
+            <button class="btn-secondary" onclick="closeModal('edit-order-modal')">Hủy</button>
+            <button class="btn-primary" onclick="updateOrder()">Lưu thay đổi</button>
+        </div>
+    </div>
+</div>
+
 <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
 
@@ -1018,6 +1087,7 @@ let cart = [];
 let currentProduct = null;
 let currentUser = null;
 let products = [];
+let orders = []; // Lưu danh sách đơn hàng
 
 // ============================================================
 // KHÔI PHỤC PHIÊN ĐĂNG NHẬP TỪ LOCALSTORAGE
@@ -1054,6 +1124,7 @@ function updateUIAfterLogin() {
     
     if (currentUser.role === 'admin') {
         document.getElementById('admin-controls').classList.add('active');
+        document.getElementById('order-management-link').style.display = 'block';
     }
 }
 
@@ -1088,15 +1159,15 @@ function displayProducts() {
     }
     
     productList.innerHTML = products.map(product => `
-        <div class="product" onclick="${isAdmin ? '' : `showProductDetail('${product.id}')`}"> 
-            <div class="product-image-container">
+        <div class="product"> 
+            <div class="product-image-container" onclick="showProductDetail('${product.id}')">
                 <img src="${product.image}" alt="${product.name}" onerror="this.src='https://via.placeholder.com/280x250?text=No+Image'">
             </div>
             <div class="product-content">
-                <h3>${product.name}</h3>
+                <h3 onclick="showProductDetail('${product.id}')" style="cursor: pointer;">${product.name}</h3>
                 <p class="product-price">${product.price.toLocaleString('vi-VN')}₫</p> 
                 <div class="product-actions">
-                    <button class="view-detail" onclick="event.stopPropagation(); showProductDetail('${product.id}')">
+                    <button class="view-detail" onclick="showProductDetail('${product.id}')">
                         Xem chi tiết
                     </button>
                     ${isAdmin ? `<button class="btn-delete-product" onclick="event.stopPropagation(); deleteProduct('${product.id}')">🗑️ Xóa</button>` : ''}
@@ -1335,7 +1406,9 @@ function logout() {
     document.getElementById('user-info').style.display = 'none';
     document.getElementById('admin-controls').classList.remove('active');
     document.getElementById('user-dropdown').classList.remove('active');
+    document.getElementById('order-management-link').style.display = 'none';
     
+    showHome();
     loadProducts();
     alert('✅ Đã đăng xuất thành công!');
 }
@@ -1405,19 +1478,12 @@ function removeFromCart(index) {
 }
 
 // =========================================================
-// 8. CHỨC NĂNG THANH TOÁN
+// 8. CHỨC NĂNG THANH TOÁN (KHÔNG CẦN ĐĂNG NHẬP)
 // =========================================================
 
 async function checkout() {
     if (cart.length === 0) {
         alert('Giỏ hàng của bạn đang trống!');
-        return;
-    }
-    
-    if (!currentUser) {
-        alert('Vui lòng đăng nhập để đặt hàng!');
-        closeModal('cart-modal');
-        showLoginModal();
         return;
     }
     
@@ -1439,8 +1505,8 @@ async function checkout() {
     const total = cart.reduce((sum, item) => sum + item.price, 0);
     
     const orderData = {
-        userId: currentUser.id,
-        userEmail: currentUser.email,
+        userId: currentUser ? currentUser.id : 'guest',
+        userEmail: currentUser ? currentUser.email : 'Khách vãng lai',
         userName: orderName,
         userPhone: orderPhone,
         userAddress: orderAddress,
@@ -1470,12 +1536,210 @@ async function checkout() {
 }
 
 // =========================================================
-// 9. CÁC CHỨC NĂNG KHÁC
+// 9. QUẢN LÝ ĐON HÀNG (ADMIN)
+// =========================================================
+
+async function loadOrders() {
+    if (!currentUser || currentUser.role !== 'admin') {
+        alert('Bạn cần quyền Admin để xem đơn hàng!');
+        return;
+    }
+    
+    try {
+        const ordersRef = db.collection('orders').orderBy('orderDate', 'desc');
+        const snapshot = await ordersRef.get();
+        
+        orders = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        }));
+        
+        displayOrders(orders);
+    } catch (error) {
+        console.error("Lỗi khi tải đơn hàng:", error);
+        document.getElementById('order-table').innerHTML = '<p style="text-align: center; padding: 40px; color: #ff4444;">Không thể tải đơn hàng!</p>';
+    }
+}
+
+function displayOrders(orderList) {
+    const orderTable = document.getElementById('order-table');
+    
+    if (orderList.length === 0) {
+        orderTable.innerHTML = '<div class="empty-orders">Chưa có đơn hàng nào</div>';
+        return;
+    }
+    
+    const statusClass = {
+        'Đang xử lý': 'status-pending',
+        'Đang giao': 'status-shipping',
+        'Hoàn thành': 'status-completed',
+        'Đã hủy': 'status-cancelled'
+    };
+    
+    orderTable.innerHTML = `
+        <table>
+            <thead>
+                <tr>
+                    <th>Mã đơn</th>
+                    <th>Khách hàng</th>
+                    <th>SĐT</th>
+                    <th>Sản phẩm</th>
+                    <th>Tổng tiền</th>
+                    <th>Trạng thái</th>
+                    <th>Thao tác</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${orderList.map(order => `
+                    <tr>
+                        <td><strong>#${order.id.substring(0, 8)}</strong></td>
+                        <td>${order.userName}</td>
+                        <td>${order.userPhone}</td>
+                        <td>${order.items.length} sản phẩm</td>
+                        <td><strong>${order.totalAmount.toLocaleString('vi-VN')}₫</strong></td>
+                        <td><span class="order-status ${statusClass[order.status] || 'status-pending'}">${order.status}</span></td>
+                        <td>
+                            <div class="order-actions">
+                                <button class="btn-order-action btn-view" onclick="viewOrderDetail('${order.id}')">👁️</button>
+                                <button class="btn-order-action btn-edit" onclick="editOrder('${order.id}')">✏️</button>
+                                <button class="btn-order-action btn-delete" onclick="deleteOrder('${order.id}')">🗑️</button>
+                            </div>
+                        </td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+}
+
+function filterOrders() {
+    const status = document.getElementById('status-filter').value;
+    
+    if (status === 'all') {
+        displayOrders(orders);
+    } else {
+        const filtered = orders.filter(order => order.status === status);
+        displayOrders(filtered);
+    }
+}
+
+function viewOrderDetail(orderId) {
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+    
+    const orderDate = order.orderDate ? new Date(order.orderDate.seconds * 1000).toLocaleString('vi-VN') : 'N/A';
+    
+    const content = `
+        <div style="line-height: 1.8;">
+            <p><strong>Mã đơn hàng:</strong> #${order.id}</p>
+            <p><strong>Ngày đặt:</strong> ${orderDate}</p>
+            <p><strong>Khách hàng:</strong> ${order.userName}</p>
+            <p><strong>Email:</strong> ${order.userEmail}</p>
+            <p><strong>Số điện thoại:</strong> ${order.userPhone}</p>
+            <p><strong>Địa chỉ:</strong> ${order.userAddress}</p>
+            <p><strong>Trạng thái:</strong> <span class="order-status status-${order.status === 'Đang xử lý' ? 'pending' : order.status === 'Hoàn thành' ? 'completed' : 'cancelled'}">${order.status}</span></p>
+            <hr style="margin: 20px 0; border: none; border-top: 1px solid #eee;">
+            <h4 style="margin-bottom: 15px;">📦 Sản phẩm đã đặt:</h4>
+            <ul style="list-style: none; padding: 0;">
+                ${order.items.map(item => `
+                    <li style="display: flex; align-items: center; gap: 15px; padding: 10px; background: #f9f9f9; margin-bottom: 10px; border-radius: 8px;">
+                        <img src="${item.image}" style="width: 50px; height: 50px; border-radius: 8px; object-fit: cover;">
+                        <div style="flex: 1;">
+                            <strong>${item.name}</strong><br>
+                            <span style="color: #667eea;">${item.price.toLocaleString('vi-VN')}₫</span>
+                        </div>
+                    </li>
+                `).join('')}
+            </ul>
+            <hr style="margin: 20px 0; border: none; border-top: 1px solid #eee;">
+            <p style="text-align: right; font-size: 18px;"><strong>Tổng cộng: ${order.totalAmount.toLocaleString('vi-VN')}₫</strong></p>
+        </div>
+    `;
+    
+    document.getElementById('order-detail-content').innerHTML = content;
+    document.getElementById('order-detail-modal').classList.add('active');
+}
+
+function editOrder(orderId) {
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+    
+    document.getElementById('edit-order-id').value = order.id;
+    document.getElementById('edit-order-name').value = order.userName;
+    document.getElementById('edit-order-phone').value = order.userPhone;
+    document.getElementById('edit-order-address').value = order.userAddress;
+    document.getElementById('edit-order-status').value = order.status;
+    
+    document.getElementById('edit-order-modal').classList.add('active');
+}
+
+async function updateOrder() {
+    const orderId = document.getElementById('edit-order-id').value;
+    const name = document.getElementById('edit-order-name').value.trim();
+    const phone = document.getElementById('edit-order-phone').value.trim();
+    const address = document.getElementById('edit-order-address').value.trim();
+    const status = document.getElementById('edit-order-status').value;
+    
+    if (!name || !phone || !address) {
+        alert('Vui lòng điền đầy đủ thông tin!');
+        return;
+    }
+    
+    try {
+        await db.collection('orders').doc(orderId).update({
+            userName: name,
+            userPhone: phone,
+            userAddress: address,
+            status: status,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        alert('✅ Đã cập nhật đơn hàng thành công!');
+        closeModal('edit-order-modal');
+        loadOrders();
+        
+    } catch (error) {
+        console.error("Lỗi khi cập nhật đơn hàng:", error);
+        alert('❌ Lỗi: Không thể cập nhật đơn hàng!');
+    }
+}
+
+async function deleteOrder(orderId) {
+    if (!confirm('Bạn có chắc muốn xóa đơn hàng này?')) return;
+    
+    try {
+        await db.collection('orders').doc(orderId).delete();
+        alert('✅ Đã xóa đơn hàng thành công!');
+        loadOrders();
+    } catch (error) {
+        console.error("Lỗi khi xóa đơn hàng:", error);
+        alert('❌ Lỗi: Không thể xóa đơn hàng!');
+    }
+}
+
+function showOrderManagement() {
+    if (!currentUser || currentUser.role !== 'admin') {
+        alert('Bạn cần quyền Admin để xem đơn hàng!');
+        return;
+    }
+    
+    document.getElementById('home-page').style.display = 'none';
+    document.getElementById('detail-page').style.display = 'none';
+    document.getElementById('order-management').classList.add('active');
+    document.getElementById('user-dropdown').classList.remove('active');
+    
+    loadOrders();
+    window.scrollTo(0, 0);
+}
+
+// =========================================================
+// 10. CÁC CHỨC NĂNG KHÁC
 // =========================================================
 
 function showHome() {
     document.getElementById('home-page').style.display = 'block';
     document.getElementById('detail-page').style.display = 'none';
+    document.getElementById('order-management').classList.remove('active');
     window.scrollTo(0, 0);
 }
 
@@ -1534,7 +1798,7 @@ document.addEventListener('click', function(event) {
 });
 
 // =========================================================
-// 10. TỰ ĐỘNG TẠO TÀI KHOẢN ADMIN NẾU CHƯA CÓ
+// 11. TỰ ĐỘNG TẠO TÀI KHOẢN ADMIN NẾU CHƯA CÓ
 // =========================================================
 async function createDefaultAdmin() {
     try {
@@ -1565,4 +1829,3 @@ loadProducts();
 updateCartCount();
 createDefaultAdmin(); // Tạo admin nếu chưa có
 </script>
-
