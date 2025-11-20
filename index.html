@@ -269,7 +269,6 @@
         border-radius: 20px;
         text-align: center;
         box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-        cursor: pointer;
         transition: all 0.4s;
         overflow: hidden;
         position: relative;
@@ -284,6 +283,7 @@
         height: 250px;
         overflow: hidden;
         background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        cursor: pointer;
     }
     .product img { 
         width: 100%;
@@ -342,6 +342,19 @@
     }
     .btn-delete-product:hover {
         background: #cc0000;
+    }
+    .btn-edit-product {
+        padding: 12px 15px;
+        background: #28a745;
+        color: white;
+        border: none;
+        border-radius: 10px;
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.3s;
+    }
+    .btn-edit-product:hover {
+        background: #218838;
     }
     
     /* Order Management */
@@ -825,7 +838,7 @@
 
 <div class="admin-controls" id="admin-controls">
     <div class="admin-header">
-        <h3>🛠️ Quản lý sản phẩm (Firebase Mode)</h3>
+        <h3>🛠️ Quản lý sản phẩm</h3>
         <div style="display: flex; gap: 10px;">
             <button class="btn-add-product" onclick="showOrderManagement()">📦 Quản lý đơn hàng</button>
             <button class="btn-add-product" onclick="showAddProductModal()">➕ Thêm sản phẩm</button>
@@ -1391,6 +1404,10 @@ async function login() {
         loadProducts();
         
         alert(`✅ Đăng nhập thành công!\nChào mừng ${userData.name}${userData.role === 'admin' ? ' - Quản trị viên' : ''}!`);
+        
+        // Debug: Kiểm tra xem admin controls có hiển thị không
+        console.log('Current user role:', currentUser.role);
+        console.log('Admin controls visible:', document.getElementById('admin-controls').classList.contains('active'));
         
     } catch (error) {
         console.error("Lỗi khi đăng nhập:", error);
